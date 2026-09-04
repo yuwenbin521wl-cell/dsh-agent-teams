@@ -293,8 +293,11 @@ function bookkeepingAssignmentPrompt(ticket: DispatchTicket, stateDir: string, t
     ticket.description || '',
     '',
     'After finishing, write your result to ' + stateDir + '/' + teamId + '/results/' + ticket.taskId + '.json using your file tools, exactly as:',
-    '{"status":"completed","output":"<one-line summary>"}   (or "failed" with a reason).',
-    'Then end your turn and become idle. The captain will read the file and close the task.',
+    'Write exactly one of:',
+    '{"status":"completed","output":"<done summary>"}  - task is finished, captain will complete it.',
+    '{"status":"failed","output":"<blocking reason>"}   - blocked, captain marks failed.',
+    '{"status":"in_progress","output":"<progress so far>"}  - still working, captain keeps it in_progress.',
+    'Then end your turn and become idle. The captain reads the file. If in_progress you may be woken again to continue; if completed/failed the task closes.'
   ].join('\n')
 }
 
@@ -304,7 +307,7 @@ async function completeTaskFromResult(ctx: Context, stateRoot: string, teamId: s
     try {
       const raw = await readFile(join(stateRoot, teamId, 'results', taskId + '.json'), 'utf8')
       const parsed = JSON.parse(raw) as { status?: unknown; output?: unknown }
-      if (typeof parsed.status !== 'string' || !['completed', 'failed'].includes(parsed.status)) return undefined
+      if (typeof parsed.status !== 'string' || !['completed', 'failed', 'in_progress'].includes(parsed.status)) return undefined
       return { status: parsed.status, output: typeof parsed.output === 'string' ? parsed.output : undefined }
     } catch { return undefined }
   }
@@ -312,10 +315,15 @@ async function completeTaskFromResult(ctx: Context, stateRoot: string, teamId: s
     const team = await readTeam(stateRoot, teamId)
     if (team === undefined) return
     const task = ownedOpenTask(team.tasks, memberName)
+      ?? team.tasks.find(function (candidate) { return candidate.assignee === memberName && candidate.status === 'failed' })
     if (task === undefined) return
     const result = await readResult(task.id)
     if (result === undefined) return
-    task.status = result.status === 'failed' ? 'failed' : 'completed'
+    if (result.status === 'in_progress') {
+      task.status = 'in_progress'
+    } else {
+      task.status = result.status === 'failed' ? 'failed' : 'completed'
+    }
     task.output = result.output
     task.updatedAt = Date.now()
     await writeTeam(stateRoot, team)
