@@ -2079,7 +2079,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const team = await readTeam(stateRoot, teamId)
       if (team === undefined) return
       for (const old of team.members) {
-        if (old.status === 'removed') continue
+        if (old.status === 'removed' || old.replacement === true) continue
         const owned = team.tasks.filter(function (t) {
           return t.assignee === old.name && (t.status === 'pending' || t.status === 'claimed' || t.status === 'in_progress')
         })
@@ -2094,7 +2094,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         const member: TeamMember = {
           id: '', name: name, role: old.role, provider: old.provider, model: old.model,
           reasoningEffort: old.reasoningEffort, executionPrompt: old.executionPrompt,
-          joinedAt: Date.now(), status: 'idle',
+          joinedAt: Date.now(), status: 'idle', replacement: true,
         }
         await spawnMember(ctx, memberRuntime(config), memberSelections, selection, caller, team, member, config.stateDir, new AbortController().signal)
         team.members.push(member)
@@ -2142,6 +2142,21 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const rehome = await rehomeTeamAfterAdopt(caller, root, adopted.teamId)
       ctx.logger.warn('team ' + adopted.teamId + ' adopted by ' + caller.id + ' (was ' + adopted.oldCaptain + ')')
       return 'Team ' + adopted.teamId + ' adopted; you are now the captain. Auto-rehomed ' + rehome.created.length + ' member(s) and reassigned ' + rehome.rehomed + ' unfinished task(s).'
+    },
+    output: { schema: { type: 'string' }, render: textRender },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'agent_teams_rehome',
+    description: 'Rehome members of the team you already captain: spawn fresh members that belong to this session and hand their unfinished tasks to them. Idempotent: only members not already created by this captain are rehomed.',
+    parameters: {},
+    async execute(_args, exec) {
+      const caller = requireCaptain(exec)
+      const ws = workspaceOf(caller)
+      const root = stateRootOf(ws, config)
+      const team = await requireCaptainTeam(ws, config, caller)
+      const result = await rehomeTeamAfterAdopt(caller, root, team.id)
+      return 'Rehomed ' + result.created.length + ' member(s), reassigned ' + result.rehomed + ' task(s).'
     },
     output: { schema: { type: 'string' }, render: textRender },
   }))

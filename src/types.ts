@@ -164,6 +164,8 @@ export interface TeamMember {
   activeModel?: string
   /** Whether the fallback route is currently active. */
   fallbackActive?: boolean
+  /** True when this member was auto-created as a replacement by adopt/rehome (child of the current captain). */
+  replacement?: boolean
   joinedAt: number
   status: MemberStatus
 }

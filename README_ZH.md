@@ -32,7 +32,7 @@
 
 ---
 
-## 工具一览（15 个）
+## 工具一览（16 个）
 `agent_teams_create`、`edit_plan`、`approve`、`add_member`、`remove_member`、`create_task`、`reassign_task`、`claim_task`、`update_task`、`send_message`、`status`、`resume`、`delete` + **`list`** + **`adopt`**。
 
 ---
