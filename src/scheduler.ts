@@ -437,6 +437,9 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           }
           const previousAssignee = task.assignee
           const attemptId = beginTaskAttempt(task, currentMember.name)
+          // In captain-bookkeeping mode members don't run the claim->in_progress
+          // ritual, so a dispatched task is immediately "in progress" (running).
+          if (config.bookkeepingByCaptain === true) task.status = 'in_progress'
           parkedAttempts.delete(currentMember.id)
           currentMember.status = 'working'
           await writeTeam(stateRoot, fresh)
