@@ -21,6 +21,7 @@ import { deliverToMember } from './members.ts'
 import {
   acknowledgeMailbox,
   beginTaskAttempt,
+  cascadeCancelDeadDependents,
   CAPTAIN_KEY,
   claimMailboxDelivery,
   findTeamByParticipant,
@@ -364,6 +365,11 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       const stateRoot = stateRootOf(workspace, config)
       const team = await readTeam(stateRoot, teamId)
       if (team === undefined || team.halted === true || team.phase === 'staged') return
+      // Auto-cancel the dead chain: dependents of a cancelled task can never run.
+      if (cascadeCancelDeadDependents(team.tasks) > 0) {
+        await writeTeam(stateRoot, team)
+        ctx.logger.warn('agent-teams: cascaded-cancelled dead dependents of cancelled tasks in ' + teamId)
+      }
       const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
       if (captain === undefined) return
       for (const member of team.members) {

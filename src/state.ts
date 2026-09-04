@@ -180,6 +180,37 @@ export function cancelUnfinishedTask(task: TeamTask, output?: string): void {
   task.updatedAt = Date.now()
 }
 
+/**
+ * Cancel every non-terminal task that depends (directly or transitively) on a
+ * cancelled task. A cancelled prerequisite can never complete, so its dependents
+ * are dead: leaving them pending would gate them forever. Mutates in place;
+ * returns how many tasks were cancelled.
+ */
+export function cascadeCancelDeadDependents(tasks: TeamTask[]): number {
+  let changed = 0
+  let again = true
+  while (again) {
+    again = false
+    const byId = new Map(tasks.map((task) => [task.id, task]))
+    for (const task of tasks) {
+      if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') continue
+      for (const dep of task.dependencies) {
+        const depTask = byId.get(dep)
+        if (depTask !== undefined && depTask.status === 'cancelled') {
+          task.status = 'cancelled'
+          task.attemptId = undefined
+          task.reassigning = false
+          task.updatedAt = Date.now()
+          changed += 1
+          again = true
+          break
+        }
+      }
+    }
+  }
+  return changed
+}
+
 export function invalidateTaskAttempt(
   task: TeamTask,
   nextAssignee?: string,
