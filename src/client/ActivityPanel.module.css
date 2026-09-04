@@ -429,6 +429,18 @@
   white-space: nowrap;
 }
 
+.showCompletedToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  line-height: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
 /* captain to member delegation tree */
 .delegationSection {
   min-width: 0;

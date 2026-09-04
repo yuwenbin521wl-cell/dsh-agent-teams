@@ -130,6 +130,42 @@ export function usesParallelTaskGrid<T extends RelationshipTask>(tasks: readonly
  * panel from leaking onto the new-session screen (or another conversation)
  * while its local open state is being reset.
  */
+/** Terminal statuses hidden by default in the DAG view. */
+const TERMINAL_TASK_STATUSES: readonly string[] = ['completed', 'failed', 'cancelled']
+
+/** Whether a task status is terminal (done / failed / cancelled). */
+export function isTerminalTaskStatus(status: unknown): boolean {
+  return typeof status === 'string' && TERMINAL_TASK_STATUSES.includes(status)
+}
+
+/**
+ * Tasks to show in the dependency DAG.
+ * With `showCompleted` false, terminal tasks are hidden unless they are a
+ * dependency (directly or transitively) of a still-in-progress task, so the
+ * graph stays connected. When true every task is shown.
+ */
+export function visibleDagTasks<T extends { readonly id: string; readonly dependencies: readonly string[]; readonly status: string }>(
+  tasks: readonly T[],
+  showCompleted: boolean,
+): readonly T[] {
+  if (showCompleted) return tasks
+  const byId = new Map(tasks.map((task) => [task.id, task]))
+  const queue: string[] = []
+  const include = new Set<string>()
+  for (const task of tasks) {
+    if (!isTerminalTaskStatus(task.status)) { include.add(task.id); queue.push(task.id) }
+  }
+  while (queue.length > 0) {
+    const id = queue.shift() as string
+    const task = byId.get(id)
+    if (task === undefined) continue
+    for (const dep of task.dependencies) {
+      if (!include.has(dep)) { include.add(dep); queue.push(dep) }
+    }
+  }
+  return tasks.filter((task) => include.has(task.id))
+}
+
 export function activityPanelExpandedForSession(
   open: boolean,
   owner: string | undefined,

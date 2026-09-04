@@ -41,6 +41,7 @@ import {
   memberRouteLabel,
   relatedTaskIds,
   taskModelLabel,
+  visibleDagTasks,
   teamIsActive,
   usesParallelTaskGrid,
 } from './activity-model.ts'
@@ -335,11 +336,13 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
   const [pinnedTaskId, setPinnedTaskId] = useState<string | null>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const focusedTaskId = dependencyFocusTaskId(pinnedTaskId, keyboardTaskId, hoverTaskId)
-  const layout = useMemo(() => compactDagLayout(tasks), [tasks])
-  const parallel = useMemo(() => usesParallelTaskGrid(tasks), [tasks])
+  const [showCompleted, setShowCompleted] = useState(false)
+  const visibleTasks = useMemo(() => visibleDagTasks(tasks, showCompleted), [tasks, showCompleted])
+  const layout = useMemo(() => compactDagLayout(visibleTasks), [visibleTasks])
+  const parallel = useMemo(() => usesParallelTaskGrid(visibleTasks), [visibleTasks])
   const related = useMemo(
-    () => focusedTaskId === null ? null : relatedTaskIds(focusedTaskId, tasks),
-    [focusedTaskId, tasks],
+    () => focusedTaskId === null ? null : relatedTaskIds(focusedTaskId, visibleTasks),
+    [focusedTaskId, visibleTasks],
   )
   const scheduleHover = (id: string | null): void => {
     if (hoverTimer.current !== null) {
@@ -384,6 +387,10 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
         <span className={css.sectionHint}>{pinnedTaskId === null
           ? t(parallel ? 'dependency.hint.parallel' : 'dependency.hint.chain')
           : t('dependency.hint.pinned', { taskId: pinnedTaskId })}</span>
+        <label className={css.showCompletedToggle} title={t('dependency.showCompletedHint')}>
+          <input type="checkbox" checked={showCompleted} onChange={(e) => setShowCompleted(e.target.checked)} />
+          <span>{t('dependency.showCompleted')}</span>
+        </label>
       </header>
       {open && (
         <>
