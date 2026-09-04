@@ -1,5 +1,7 @@
 # dsh-agent-teams（你的 fork）
 
+> **Topics / 关键词**：`dsh` `deepseek-harness` `plugin` `multi-agent` `agent-teams` `ai-agents` `orchestration` `subagent` `collaboration`
+
 基于 `@nanmicoder/dsh-agent-teams` v0.1.15 的**私有多 Agent 协作插件**，移植并适配到 **DeepSeek Harness 0.1.2-alpha.4**，并新增了「新会话接管旧团队」「队长代做账」等增强。
 
 一句话：把当前 DSH 会话变成队长，创建可续聊的子 Agent 成员、把目标拆成带依赖的任务、自动调度、成员直达消息、持久化状态 + Web 活动面板。无需额外 Workflow 引擎。
