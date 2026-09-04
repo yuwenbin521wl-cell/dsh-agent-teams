@@ -579,7 +579,10 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
         await completeTaskFromResult(ctx, stateRoot, located.id, member.name)
       }
     }
-    if (status === 'idle') await runtime.kickMember(workspace, located.id, member.name)
+    // On any idle edge, dispatch ready work to EVERY idle member (not just the
+    // one that just settled), so independent tasks run in parallel without the
+    // captain having to manually reassign.
+    if (status === 'idle') await runtime.kickTeam(workspace, located.id)
   }
 
   ctx.on('agent/status', ({ agent, status }) => {
