@@ -21,3 +21,6 @@
         memberProvider: spawn
         # Captain/plugin performs member task bookkeeping from a result file (members need not have agent_teams tools).
         memberBookkeepingByCaptain: true
+        # Auto-create a replacement member when a member crosses the context threshold and transfer its open tasks.
+        autoReplaceEnabled: true
+        autoReplaceThreshold: 0.7

@@ -47,6 +47,10 @@ export interface SchedulerConfig {
   readonly autoReplaceThreshold?: number
   /** When true, the plugin closes tasks itself from a member result file (captain bookkeeping). */
   readonly bookkeepingByCaptain?: boolean
+  /** When true, auto-spawn a replacement member when a member crosses the context threshold. */
+  readonly autoReplaceEnabled?: boolean
+  /** Callback that spawns a replacement member for one context-full member and transfers its open tasks. */
+  readonly spawnReplacement?: (captain: Agent, stateRoot: string, teamId: string, memberName: string) => Promise<{ created: boolean; replacementName?: string }>
 }
 
 export interface TeamScheduler {
@@ -577,7 +581,19 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
     if (status === 'idle') {
       const occ = readMemberContextPressure(ctx, agent)
       if (occ !== undefined && config.autoReplaceThreshold !== undefined && occ >= config.autoReplaceThreshold) {
-        ctx.logger.warn('agent-teams: member ' + member.name + ' context pressure ' + (occ * 100).toFixed(0) + '% >= ' + (config.autoReplaceThreshold * 100).toFixed(0) + '% threshold; consider a replacement member')
+        if (config.autoReplaceEnabled === true && config.spawnReplacement !== undefined) {
+          const cap = ctx.agents.get(located.captainSessionId as SessionId)
+          if (cap !== undefined) {
+            try {
+              const r = await config.spawnReplacement(cap, stateRoot, located.id, member.name)
+              if (r.created === true) await runtime.kickTeam(stateRoot, located.id, cap)
+            } catch (e) {
+              ctx.logger.warn('agent-teams: auto-replace failed for ' + member.name + ': ' + String(e))
+            }
+          }
+        } else {
+          ctx.logger.warn('agent-teams: member ' + member.name + ' context pressure ' + (occ * 100).toFixed(0) + '% >= ' + (config.autoReplaceThreshold * 100).toFixed(0) + '% threshold; consider a replacement (autoReplaceEnabled=false)')
+        }
       }
     }
     if (status === 'idle') {

@@ -473,7 +473,7 @@ export function stagedPlanFeedbackContext(teamName: string): string {
 export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): AgentTeamsRuntime {
   installRetiredMemberGuard(ctx, config.stateDir)
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir)
-  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt, autoReplaceThreshold: config.autoReplaceThreshold, bookkeepingByCaptain: config.memberBookkeepingByCaptain ?? false })
+  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt, autoReplaceThreshold: config.autoReplaceThreshold, bookkeepingByCaptain: config.memberBookkeepingByCaptain ?? false, autoReplaceEnabled: config.autoReplaceEnabled ?? false, spawnReplacement: rehomeOneMember })
 
   const updateStagedPlanBatch: AgentTeamsRuntime['updateStagedPlanBatch'] = async (captain, teamId, mutations, signal) => {
     if (mutations.length === 0) throw new Error('at least one staged plan operation is required')
@@ -2111,6 +2111,46 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     await scheduler.kickTeam(stateRoot, teamId, caller)
     ctx.logger.warn('agent-teams: auto-rehome after adopt created ' + created.length + ' member(s), reassigned ' + rehomed + ' task(s)')
     return { rehomed: rehomed, created: created }
+  }
+
+  /** Spawn a replacement member (child of caller) for one context-full member and transfer its open tasks. */
+  async function rehomeOneMember(caller: Agent, stateRoot: string, teamId: string, oldName: string): Promise<{ created: boolean; replacementName?: string }> {
+    let created = false
+    let replacementName: string | undefined
+    await withTeamLock('rehome:' + stateRoot + ':' + teamId, async function () {
+      const team = await readTeam(stateRoot, teamId)
+      if (team === undefined) return
+      const old = team.members.find(function (m) { return m.name === oldName && m.status !== 'removed' })
+      if (old === undefined) return
+      const owned = team.tasks.filter(function (t) {
+        return t.assignee === old.name && (t.status === 'pending' || t.status === 'claimed' || t.status === 'in_progress')
+      })
+      if (owned.length === 0) return
+      const name = old.name + '-r3'
+      const selection: MemberLlmSelection = {
+        provider: old.provider ?? '', model: old.model ?? '',
+        ...(old.reasoningEffort ? { reasoningEffort: old.reasoningEffort } : {}),
+        ...(old.fallback ? { fallback: old.fallback } : {}),
+      }
+      const member: TeamMember = {
+        id: '', name: name, role: old.role, provider: old.provider, model: old.model,
+        reasoningEffort: old.reasoningEffort, executionPrompt: old.executionPrompt,
+        joinedAt: Date.now(), status: 'idle', replacement: true,
+      }
+      await spawnMember(ctx, memberRuntime(config), memberSelections, selection, caller, team, member, config.stateDir, new AbortController().signal)
+      team.members.push(member)
+      for (const t of team.tasks) {
+        if (t.assignee === old.name && (t.status === 'pending' || t.status === 'claimed' || t.status === 'in_progress')) {
+          t.assignee = name; t.status = 'pending'; t.attemptId = undefined; t.attempt = (t.attempt ?? 0) + 1; t.reassigning = false; t.updatedAt = Date.now()
+        }
+      }
+      old.status = 'removed'
+      await writeTeam(stateRoot, team)
+      created = true
+      replacementName = name
+    })
+    if (created && replacementName !== undefined) ctx.logger.warn('agent-teams: auto-replace ' + oldName + ' -> ' + replacementName)
+    return { created: created, replacementName: replacementName }
   }
 
   ctx.tools.register(defineTool({
