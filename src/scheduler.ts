@@ -376,6 +376,24 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       }
       const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
       if (captain === undefined) return
+      // Auto-replace context-full resident members on every kick (not only the
+      // idle-edge), so a cold-restored, already-exhausted team also gets replacements.
+      if (config.autoReplaceEnabled === true && config.spawnReplacement !== undefined) {
+        for (const m of team.members) {
+          if (m.status === 'removed' || m.id === '') continue
+          const live = ctx.agents.get(m.id as SessionId)
+          if (live === undefined) continue
+          const occ = readMemberContextPressure(ctx, live)
+          if (occ === undefined || config.autoReplaceThreshold === undefined || occ < config.autoReplaceThreshold) continue
+          if (ownedOpenTask(team.tasks, m.name) === undefined) continue
+          try {
+            const r = await config.spawnReplacement(captain, stateRoot, teamId, m.name)
+            if (r.created === true) ctx.logger.warn('agent-teams: auto-replaced context-full ' + m.name + ' (kickTeam)')
+          } catch (e) {
+            ctx.logger.warn('agent-teams: auto-replace failed for ' + m.name + ': ' + String(e))
+          }
+        }
+      }
       for (const member of team.members) {
         if (member.status === 'removed') continue
         await runtime.kickMember(workspace, teamId, member.name, captain)
