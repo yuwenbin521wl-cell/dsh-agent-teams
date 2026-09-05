@@ -2083,7 +2083,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         const owned = team.tasks.filter(function (t) {
           return t.assignee === old.name && (t.status === 'pending' || t.status === 'claimed' || t.status === 'in_progress')
         })
-        if (owned.length === 0) continue
+        if (owned.length === 0) {
+          // No open work for this old member: retire it so it does not occupy a
+          // slot of the adopted team (the new captain cannot wake old members anyway).
+          old.status = 'removed'
+          continue
+        }
         const name = old.name + '-r2'
         const selection: MemberLlmSelection = {
           provider: old.provider ?? '',
