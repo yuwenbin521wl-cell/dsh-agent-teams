@@ -1864,16 +1864,41 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_status',
-    description: 'Team snapshot: members with live activity and tasks with status/assignee/dependencies/output. Captains also see every team mailbox; members see only their own inbox. Poll this to watch progress.',
-    parameters: {},
+    description: 'Team snapshot: members with live activity and tasks with status/assignee/dependencies/output. Captains also see every team mailbox; members see only their own inbox. Pass team_id to READ-ONLY view any team by id (does NOT take over / change owner). Poll this to watch progress.',
+    parameters: { team_id: { type: 'string', description: 'Optional: read-only view a team by its id (does not adopt/take over).' } },
     output: {
       schema: { type: 'object', additionalProperties: true, properties: {} },
       render: (_args, value) => [{ type: 'text', text: renderStatus(value) }],
     },
-    async execute(_args, exec) {
+    async execute(args, exec) {
       const caller = requireCaptain(exec)
       const workspace = workspaceOf(caller)
       const stateRoot = stateRootOf(workspace, config)
+      const viewTeamId = (args.team_id ?? '').trim()
+      if (viewTeamId !== '') {
+        // Read-only view of another team: do NOT adopt, do NOT change owner, do NOT kick/mailbox.
+        const team = await readTeam(stateRoot, viewTeamId)
+        if (team === undefined) throw new Error('team "' + viewTeamId + '" not found')
+        const activity = memberActivity(ctx, team.members.map((m) => m.id))
+        const members = team.members
+          .filter((m) => m.status !== 'removed')
+          .map((m) => ({
+            name: m.name, role: m.role ?? '', provider: m.provider ?? '', model: m.model ?? '',
+            reasoning_effort: m.reasoningEffort ?? '', status: m.status,
+            activity: m.id !== '' ? (activity.get(m.id) ?? 'unknown') : 'unspawned',
+          }))
+        const tasks = team.tasks.map((task) => ({
+          id: task.id, subject: task.subject, status: task.status, assignee: task.assignee ?? '',
+          dependencies: task.dependencies, attempt: task.attempt ?? 0, attempt_id: task.attemptId ?? '',
+          reassigning: task.reassigning === true, kind: taskKindOf(task),
+          ...(task.round === undefined ? {} : { round: task.round }),
+          ...(task.verdict === undefined ? {} : { verdict: task.verdict }),
+          findings_open: (task.findings ?? []).filter((f) => f.resolved !== true).length,
+          ...(task.profileSeedId === undefined ? {} : { seed_id: task.profileSeedId }),
+          ...(task.output !== undefined ? { output: task.output } : {}),
+        }))
+        return { team_name: team.name, team_id: team.id, viewer: 'viewer', phase: team.phase ?? 'running', members, tasks }
+      }
       const located = await requireParticipantTeam(workspace, config, caller)
       if (located.captainSessionId === caller.id) {
         await scheduler.kickTeam(workspace, located.id, caller)
