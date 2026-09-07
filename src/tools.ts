@@ -1167,9 +1167,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         const member = requireMember(fresh, args.name)
         const requeued: string[] = []
         for (const task of fresh.tasks) {
-          if (task.assignee !== member.name || task.status === 'completed') continue
-          invalidateTaskAttempt(task)
+          if (task.assignee !== member.name) continue
+          if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') continue
+          task.status = 'pending'
+          task.assignee = undefined
+          task.attemptId = undefined
+          task.handoffId = undefined
           task.reassigning = false
+          task.updatedAt = Date.now()
           requeued.push(task.id)
         }
         member.status = 'removed'
