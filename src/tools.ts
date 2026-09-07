@@ -2315,6 +2315,27 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
   }))
 
   ctx.tools.register(defineTool({
+    name: 'agent_teams_set_contract',
+    description: 'Set (or replace) the team hard rules (contract), injected into every member persona and task assignment. Call whenever the user states a binding constraint.',
+    parameters: {
+      contract: { type: 'string', required: true, description: 'The hard rules the team must follow.' },
+    },
+    async execute(args, exec) {
+      const caller = requireCaptain(exec)
+      const ws = workspaceOf(caller)
+      const root = stateRootOf(ws, config)
+      const team = await requireCaptainTeam(ws, config, caller)
+      await withTeamLock(teamLockKey(root, team.id), async () => {
+        const fresh = await requireFreshCaptainTeam(root, team.id, caller.id)
+        fresh.contract = args.contract.trim()
+        await writeTeam(root, fresh)
+      })
+      return 'Team contract updated.'
+    },
+    output: { schema: { type: 'string' }, render: textRender },
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'agent_teams_delete',
     description: 'End your team: interrupts all members (best effort) and deletes the team\'s state directory (team file, tasks, mailboxes). Use when the team\'s work is done or abandoned.',
     parameters: {},

@@ -436,7 +436,7 @@ export async function spawnMember(
       request: {
         prompt: [{ type: 'text', text: memberWelcome(team, member.name) }],
         parent: captain,
-        persona: memberPersona(team, member, stateDir, config.executionPrompt),
+        persona: (team.contract ? 'HARD CONTRACT (must follow):\n' + team.contract + '\n\n' : '') + memberPersona(team, member, stateDir, config.executionPrompt),
         toolFilter: { deny: [...MEMBER_DENIED_TOOLS] },
         agentOptions: {
           provider: llmSelection.provider,

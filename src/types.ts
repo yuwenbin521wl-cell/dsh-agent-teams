@@ -250,4 +250,6 @@ export interface TeamState {
   escalated?: boolean
   /** A pending human decision the captain must re-surface (preserved across adopt/handoff). */
   pendingDecision?: { question: string; options?: string[]; createdAt: number }
+  /** Hard rules the team must follow, injected into every member persona and task assignment. */
+  contract?: string
 }

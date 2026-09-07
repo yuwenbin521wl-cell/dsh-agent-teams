@@ -50,7 +50,7 @@
 ## 六、成员 preset 守卫 + 客户端包名
 - **member preset 守卫**：默认只允许 `standard`（避免生成只拿 bash/str_replace 的“缺 agent_teams 工具”成员）；**开启 bookkeeping 后放宽**（允许梁神/极简 preset，因为成员不再需要 agent_teams 工具也能闭环）。
 - **`memberBookkeepingByCaptain`（队长代做账，默认 true）**：成员无需 `agent_teams_*` 工具，只写 `results/<taskId>.json`，插件/队长闭环。
-- **包名统一为 `dsh-agent-teams`**：`package.json.name`、`node_modules` 副本、`lib/client.js` 的 `__ModuleLoader__ id` 三处一致（避免 `without registering`）。
+- **团队契约自动注入**：用 `agent_teams_set_contract` 写入硬规则，插件会自动把它注入到每个成员 persona 和每次任务派工提示（不再只出现在早期聊天里被遗忘）。\n- **包名统一为 `dsh-agent-teams`**：`package.json.name`、`node_modules` 副本、`lib/client.js` 的 `__ModuleLoader__ id` 三处一致（避免 `without registering`）。
 
 ---
 

@@ -518,7 +518,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           ctx,
           captain,
           ticket.memberId,
-          config.bookkeepingByCaptain ? bookkeepingAssignmentPrompt(ticket, config.stateDir, team.id) : assignmentPrompt(ticket, config.stateDir, team.id),
+          (team.contract ? 'HARD CONTRACT (must follow; do not deviate):\n' + team.contract + '\n\n' : '') + (config.bookkeepingByCaptain ? bookkeepingAssignmentPrompt(ticket, config.stateDir, team.id) : assignmentPrompt(ticket, config.stateDir, team.id)),
           new AbortController().signal,
         )
         if (accepted) return
