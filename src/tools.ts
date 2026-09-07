@@ -1901,6 +1901,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           findings_open: (task.findings ?? []).filter((f) => f.resolved !== true).length,
           ...(task.profileSeedId === undefined ? {} : { seed_id: task.profileSeedId }),
           ...(task.output !== undefined ? { output: task.output } : {}),
+          updated_at: task.updatedAt,
         }))
         return { team_name: team.name, team_id: team.id, viewer: 'viewer', phase: team.phase ?? 'running', members, tasks, ...(team.pendingDecision ? { pending_decision: team.pendingDecision } : {}) }
       }
@@ -1939,6 +1940,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         findings_open: (task.findings ?? []).filter((finding) => finding.resolved !== true).length,
         ...task.profileSeedId === undefined ? {} : { seed_id: task.profileSeedId },
         ...task.output !== undefined ? { output: task.output } : {},
+        updated_at: task.updatedAt,
       }))
       const mailboxWarnings: string[] = []
       let mailboxWarningCount = 0
@@ -2687,7 +2689,7 @@ function renderStatus(value: JsonValue): string {
       status: string
       activity: string
     }[]
-    tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; attempt: number; attempt_id: string; reassigning: boolean; seed_id?: string; output?: string; kind?: string; round?: number; verdict?: string; findings_open?: number }[]
+    tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; attempt: number; attempt_id: string; reassigning: boolean; seed_id?: string; output?: string; kind?: string; round?: number; verdict?: string; findings_open?: number; updated_at?: number }[]
     captain_inbox: { from: string; content: string }[]
     member_inboxes: Record<string, { count: number; latest: string }>
     mailbox_warnings: string[]
@@ -2730,7 +2732,9 @@ function renderStatus(value: JsonValue): string {
       const kind = task.kind ? ` ${task.kind}` : ''
       const round = task.round === undefined ? '' : ` r${task.round}`
       const verdict = task.verdict === undefined ? '' : ` verdict ${task.verdict}`
-      return `  - ${task.id} [${task.status}]${kind}${round}${verdict} attempt ${task.attempt}${handoff}${seed} ${task.subject} → ${task.assignee || 'unassigned'}${deps}${output}`
+      const stall = task.updated_at !== undefined && (task.status === 'in_progress' || task.status === 'claimed') && Date.now() - task.updated_at > 30 * 60 * 1000
+      const updated = task.updated_at !== undefined ? ` ⏱${Math.floor((Date.now() - task.updated_at) / 60000)}min` : ''
+      return `  - ${task.id} [${task.status}]${kind}${round}${verdict} attempt ${task.attempt}${handoff}${seed} ${task.subject} → ${task.assignee || 'unassigned'}${deps}${output}${updated}${stall ? ' ⚠️no-progress-30min' : ''}`
     }),
     ...team.coverage === undefined || team.coverage.length === 0 ? [] : [
       'Coverage:',

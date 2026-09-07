@@ -302,6 +302,7 @@ function bookkeepingAssignmentPrompt(ticket: DispatchTicket, stateDir: string, t
     '{"status":"completed","output":"<done summary>"}  - task is finished, captain will complete it.',
     '{"status":"failed","output":"<blocking reason>"}   - blocked, captain marks failed.',
     '{"status":"in_progress","output":"<progress so far>"}  - still working, captain keeps it in_progress.',
+    'While working, refresh the result file PERIODICALLY (at least every few minutes) with {"status":"in_progress","output":"<percent/milestone, e.g. 40% - done X, next Y>"} so the captain/team can see how far you have got and detect if you are stuck.',
     'Then end your turn and become idle. The captain reads the file. If in_progress you may be woken again to continue; if completed/failed the task closes.'
   ].join('\n')
 }
