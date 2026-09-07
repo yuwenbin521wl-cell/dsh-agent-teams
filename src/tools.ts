@@ -2165,7 +2165,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         return t.assignee === old.name && (t.status === 'pending' || t.status === 'claimed' || t.status === 'in_progress')
       })
       if (owned.length === 0) return
-      const name = old.name + '-r3'
+      const used = new Set(team.members.map(function (m) { return m.name }))
+      let n = 3
+      while (used.has(old.name + '-r' + n)) { n += 1 }
+      const name = old.name + '-r' + n
       const selection: MemberLlmSelection = {
         provider: old.provider ?? '', model: old.model ?? '',
         ...(old.reasoningEffort ? { reasoningEffort: old.reasoningEffort } : {}),
