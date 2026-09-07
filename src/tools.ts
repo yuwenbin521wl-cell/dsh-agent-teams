@@ -2316,21 +2316,28 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_set_contract',
-    description: 'Set (or replace) the team hard rules (contract), injected into every member persona and task assignment. Call whenever the user states a binding constraint.',
+    description: 'Set the team hard rules (contract), injected into every member persona and task assignment. mode=append adds a new rule keeping existing ones; mode=replace overwrites.',
     parameters: {
-      contract: { type: 'string', required: true, description: 'The hard rules the team must follow.' },
+      contract: { type: 'string', required: true, description: 'The hard rules (or new rule to append).' },
+      mode: { type: 'string', enum: ['append', 'replace'], description: 'append (default) adds a rule to the existing contract; replace overwrites it.' },
     },
     async execute(args, exec) {
       const caller = requireCaptain(exec)
       const ws = workspaceOf(caller)
       const root = stateRootOf(ws, config)
       const team = await requireCaptainTeam(ws, config, caller)
+      const mode = args.mode ?? 'append'
       await withTeamLock(teamLockKey(root, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(root, team.id, caller.id)
-        fresh.contract = args.contract.trim()
+        const rule = args.contract.trim()
+        if (mode === 'replace') {
+          fresh.contract = rule
+        } else {
+          fresh.contract = fresh.contract ? fresh.contract + '\n' + rule : rule
+        }
         await writeTeam(root, fresh)
       })
-      return 'Team contract updated.'
+      return 'Team contract updated (' + mode + ').'
     },
     output: { schema: { type: 'string' }, render: textRender },
   }))
