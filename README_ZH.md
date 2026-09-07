@@ -50,7 +50,11 @@
 ## 六、成员 preset 守卫 + 客户端包名
 - **member preset 守卫**：默认只允许 `standard`（避免生成只拿 bash/str_replace 的“缺 agent_teams 工具”成员）；**开启 bookkeeping 后放宽**（允许梁神/极简 preset，因为成员不再需要 agent_teams 工具也能闭环）。
 - **`memberBookkeepingByCaptain`（队长代做账，默认 true）**：成员无需 `agent_teams_*` 工具，只写 `results/<taskId>.json`，插件/队长闭环。
-- **团队契约自动注入**：用 `agent_teams_set_contract` 写入硬规则，插件会自动把它注入到每个成员 persona 和每次任务派工提示（不再只出现在早期聊天里被遗忘）。\n- **包名统一为 `dsh-agent-teams`**：`package.json.name`、`node_modules` 副本、`lib/client.js` 的 `__ModuleLoader__ id` 三处一致（避免 `without registering`）。
+- **团队契约自动注入**：用 `agent_teams_set_contract` 写入硬规则，插件会自动把它注入到每个成员 persona 和每次任务派工提示（不再只出现在早期聊天里被遗忘）。
+- **用法（不用记命令）**：你直接用自然语言说“写进团队契约：必须复用 v39 的 GraphRunner，不得自实现执行器”，队长会**自动**调用 `agent_teams_set_contract` 写入；无需你打工具指令。
+- **追加 vs 覆盖**：`mode=append`（默认）追加新规则保留旧规则；`mode=replace` 整体覆盖。
+- **怎么写好契约**：具体可核对（复用 X / 禁止 Y / 必须引用 Z）、显式负向约束（不得…）、给出权威来源（以 v39 源码/反编译为准）、给出“不一致时怎么办”（先停下向用户确认）、给出验收证据形式（引用 v39 代码/日志而非口头承诺）。
+- **配合验收兜底**：任务用 `objective/acceptance/inScope/outOfScope/verify` 把约束写进合同（如 `outOfScope=["自实现执行器"]`、`acceptance=["复用 v39 GraphRunner"]`），并建 `kind=review` 门禁，不合规 `needs_revision` 打回。\n- **包名统一为 `dsh-agent-teams`**：`package.json.name`、`node_modules` 副本、`lib/client.js` 的 `__ModuleLoader__ id` 三处一致（避免 `without registering`）。
 
 ---
 
