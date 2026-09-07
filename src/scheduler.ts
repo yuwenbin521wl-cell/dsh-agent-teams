@@ -374,6 +374,15 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
         await writeTeam(stateRoot, team)
         ctx.logger.warn('agent-teams: cascaded-cancelled dead dependents of cancelled tasks in ' + teamId)
       }
+      // Pick up any completed/failed result files for members' open tasks on every
+      // kick (not only the idle edge), so a "reported completed" task actually closes.
+      if (config.bookkeepingByCaptain === true) {
+        for (const m of team.members) {
+          if (m.status !== 'removed' && m.id !== '') {
+            await completeTaskFromResult(ctx, stateRoot, teamId, m.name)
+          }
+        }
+      }
       const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
       if (captain === undefined) return
       // Auto-replace context-full resident members on every kick (not only the
