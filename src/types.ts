@@ -248,4 +248,6 @@ export interface TeamState {
   reviewPolicy?: ReviewPolicy
   /** Set when an automatic review/repair loop hits its configured ceiling. */
   escalated?: boolean
+  /** A pending human decision the captain must re-surface (preserved across adopt/handoff). */
+  pendingDecision?: { question: string; options?: string[]; createdAt: number }
 }

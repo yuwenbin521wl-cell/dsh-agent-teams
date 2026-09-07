@@ -1902,7 +1902,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           ...(task.profileSeedId === undefined ? {} : { seed_id: task.profileSeedId }),
           ...(task.output !== undefined ? { output: task.output } : {}),
         }))
-        return { team_name: team.name, team_id: team.id, viewer: 'viewer', phase: team.phase ?? 'running', members, tasks }
+        return { team_name: team.name, team_id: team.id, viewer: 'viewer', phase: team.phase ?? 'running', members, tasks, ...(team.pendingDecision ? { pending_decision: team.pendingDecision } : {}) }
       }
       const located = await requireParticipantTeam(workspace, config, caller)
       if (located.captainSessionId === caller.id) {
@@ -1984,6 +1984,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const result = {
         team_id: team.id,
         team_name: team.name,
+        ...(team.pendingDecision ? { pending_decision: team.pendingDecision } : {}),
         description: team.description ?? '',
         phase: team.phase ?? 'running',
         halted: loop.halted,
@@ -2264,6 +2265,51 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         '',
         '建议流程: 建队 -> agent_teams_list 看 id -> agent_teams_status(只读) -> 需要再接时 agent_teams_adopt -> agent_teams_rehome -> agent_teams_status',
       ].join('\n')
+    },
+    output: { schema: { type: 'string' }, render: textRender },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'agent_teams_set_decision',
+    description: 'Record a pending human decision on the team (preserved across adopt/handoff). Call before handing the team off if a choice awaits the user.',
+    parameters: {
+      question: { type: 'string', required: true, description: 'The decision being asked of the user.' },
+      options: { type: 'array', items: { type: 'string' }, description: 'Optional choices (甲/乙...).' },
+    },
+    async execute(args, exec) {
+      const caller = requireCaptain(exec)
+      const ws = workspaceOf(caller)
+      const root = stateRootOf(ws, config)
+      const team = await requireCaptainTeam(ws, config, caller)
+      await withTeamLock(teamLockKey(root, team.id), async () => {
+        const fresh = await requireFreshCaptainTeam(root, team.id, caller.id)
+        fresh.pendingDecision = {
+          question: args.question.trim(),
+          options: Array.isArray(args.options) ? args.options.map((o) => String(o)) : undefined,
+          createdAt: Date.now(),
+        }
+        await writeTeam(root, fresh)
+      })
+      return 'Pending decision recorded.'
+    },
+    output: { schema: { type: 'string' }, render: textRender },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'agent_teams_clear_decision',
+    description: 'Clear the recorded pending decision (call after the user decides).',
+    parameters: {},
+    async execute(_args, exec) {
+      const caller = requireCaptain(exec)
+      const ws = workspaceOf(caller)
+      const root = stateRootOf(ws, config)
+      const team = await requireCaptainTeam(ws, config, caller)
+      await withTeamLock(teamLockKey(root, team.id), async () => {
+        const fresh = await requireFreshCaptainTeam(root, team.id, caller.id)
+        fresh.pendingDecision = undefined
+        await writeTeam(root, fresh)
+      })
+      return 'Pending decision cleared.'
     },
     output: { schema: { type: 'string' }, render: textRender },
   }))
@@ -2625,6 +2671,7 @@ function renderStatus(value: JsonValue): string {
     deliverable?: boolean
     coverage?: { goal_item: string; status: string; task_ids: string[] }[]
     delivery?: { ok: boolean; blockers: string[] }
+    pending_decision?: { question: string; options?: string[] }
   }
   const flags = [
     team.halted ? 'halted' : undefined,
@@ -2636,6 +2683,7 @@ function renderStatus(value: JsonValue): string {
   ].filter((item): item is string => item !== undefined)
   const lines: string[] = [
     `Team "${team.team_name}"${team.description ? ` — ${team.description}` : ''}${flags.length > 0 ? ` [${flags.join(', ')}]` : ''}`,
+    ...team.pending_decision ? [`  ⚠️ Pending decision: ${team.pending_decision.question}${team.pending_decision.options && team.pending_decision.options.length > 0 ? ' — ' + team.pending_decision.options.join(' / ') : ''}`] : [],
     ...team.profile === undefined ? [] : [`Profile: ${team.profile.name}${team.profile.task_planning ? ` [${team.profile.task_planning}]` : ''}${team.profile.protocol ? ` — ${team.profile.protocol}` : ''}`],
     ...team.loop_summary ? [`Loop: ${team.loop_state ?? ''} — ${team.loop_summary}`.replace(/^Loop:  — /u, 'Loop: ')] : [],
     `Viewing as: ${team.viewer}`,

@@ -161,7 +161,7 @@ export function usageSectionText(toolNames: string, profilesText = ''): string {
 8. Quality kinds (requirements, implementation, verification, review, repair, integration) need a contract: non-empty objective and acceptance; implementation/repair also need inScope and verify. Review/requirements can complete only with verdict=pass; needs_revision/reject must fail with findings. The system then opens repair + next review that depend on the successful source, never the failed review. Do not approve your own implementation. create_task no longer silently resumes a halted team — call agent_teams_resume with a reason, or create_task({resume:true, resumeReason}).
 9. ${qualityPlanningPrompt()}
 10. Present the team's results to the user, then agent_teams_delete the team unless the user wants to keep working with it. Stopping a team aborts the Captain's current turn as well as member work; only a later explicit user turn may resume it.
-11. Context management: DO NOT compact/compress context to keep working. When a member reaches ~70% context, prefer a fresh member: agent_teams_add_member, or agent_teams_rehome to re-home the context-full member\'s open tasks. When YOUR OWN captain context reaches ~70%, do not compress and do not self-drive; wrap up, then hand the team to a fresh-session captain via agent_teams_adopt (the team state is durable, so re-home members and continue). Before ANY handoff/new-team switch, write the key conclusions/decisions into the relevant task\'s output (agent_teams_update_task output) or a results file, so the new member/captain inherits the true state and nothing is lost. After adopting a team, read agent_teams_status (it carries every task's output and the results/ files) before deciding next steps — the durable team state IS the continuity; do NOT ask the user to re-explain the previous conversation.
+11. Context management: DO NOT compact/compress context to keep working. When a member reaches ~70% context, prefer a fresh member: agent_teams_add_member, or agent_teams_rehome to re-home the context-full member\'s open tasks. When YOUR OWN captain context reaches ~70%, do not compress and do not self-drive; wrap up, then hand the team to a fresh-session captain via agent_teams_adopt (the team state is durable, so re-home members and continue). Before ANY handoff/new-team switch, write the key conclusions/decisions into the relevant task\'s output (agent_teams_update_task output) or a results file, so the new member/captain inherits the true state and nothing is lost. If a decision is awaiting the user (e.g. 甲/乙 choice), record it with agent_teams_set_decision before any handoff so it survives and the next captain re-asks it; clear it with agent_teams_clear_decision after the user decides. After adopting a team, read agent_teams_status (it carries every task's output and the results/ files) before deciding next steps — the durable team state IS the continuity; do NOT ask the user to re-explain the previous conversation.
 
 Tools: ${toolNames}${profilesText === '' ? '' : `\n\n${profilesText}`}`
 }
@@ -205,6 +205,8 @@ export function apply(ctx: Context, config: Config): void {
     'agent_teams_adopt',
     'agent_teams_rehome',
     'agent_teams_help',
+    'agent_teams_set_decision',
+    'agent_teams_clear_decision',
     'agent_teams_delete',
   ].join(', ')
   ctx.systemPrompt.section({
