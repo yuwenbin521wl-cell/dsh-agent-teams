@@ -2237,6 +2237,31 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
   }))
 
   ctx.tools.register(defineTool({
+    name: 'agent_teams_help',
+    description: 'Print a quick reference of common AgentTeams commands (list / status(read-only by id) / adopt / rehome / add_member / remove_member / reassign).',
+    parameters: {},
+    async execute(_args, exec) {
+      return [
+        'AgentTeams 常用指令速查:',
+        '',
+        '· 列团队(得 id):       agent_teams_list',
+        '· 看当前团队状态:       agent_teams_status',
+        '· 只读看某团队:         agent_teams_status team_id=<id>',
+        '· 接管(换队长+自动补位): agent_teams_adopt <id>',
+        '· 手动补位(已接管):     agent_teams_rehome',
+        '· 加成员:               agent_teams_add_member name=<name> role=<role>',
+        '· 移除成员(自动重排任务): agent_teams_remove_member <name>',
+        '· 转派任务:             agent_teams_reassign_task task_id=<id> assignee=<name>',
+        '· 建任务:               agent_teams_create_task subject=<subject> dependencies=[...] assignee=<name>',
+        '· 更新任务:             agent_teams_update_task task_id=<id> status=<in_progress|completed|failed> attempt_id=<id>',
+        '',
+        '建议流程: 建队 -> agent_teams_list 看 id -> agent_teams_status(只读) -> 需要再接时 agent_teams_adopt -> agent_teams_rehome -> agent_teams_status',
+      ].join('\n')
+    },
+    output: { schema: { type: 'string' }, render: textRender },
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'agent_teams_delete',
     description: 'End your team: interrupts all members (best effort) and deletes the team\'s state directory (team file, tasks, mailboxes). Use when the team\'s work is done or abandoned.',
     parameters: {},

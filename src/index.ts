@@ -204,6 +204,7 @@ export function apply(ctx: Context, config: Config): void {
     'agent_teams_list',
     'agent_teams_adopt',
     'agent_teams_rehome',
+    'agent_teams_help',
     'agent_teams_delete',
   ].join(', ')
   ctx.systemPrompt.section({
