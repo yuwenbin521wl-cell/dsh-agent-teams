@@ -2109,17 +2109,21 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const team = await readTeam(stateRoot, teamId)
       if (team === undefined) return
       for (const old of team.members) {
-        if (old.status === 'removed' || old.replacement === true) continue
+        // Rehome/retire EVERY old member (including members created by a previous
+        // adopt — replacement=true) so a new takeover leaves a clean set of
+        // captain-owned members and no leftover slots/tasks.
+        if (old.status === 'removed') continue
         const owned = team.tasks.filter(function (t) {
           return t.assignee === old.name && (t.status === 'pending' || t.status === 'claimed' || t.status === 'in_progress')
         })
         if (owned.length === 0) {
-          // No open work for this old member: retire it so it does not occupy a
-          // slot of the adopted team (the new captain cannot wake old members anyway).
           old.status = 'removed'
           continue
         }
-        const name = old.name + '-r2'
+        const used = new Set(team.members.map(function (m) { return m.name }))
+        let n = 2
+        while (used.has(old.name + '-r' + n)) { n += 1 }
+        const name = old.name + '-r' + n
         const selection: MemberLlmSelection = {
           provider: old.provider ?? '',
           model: old.model ?? '',
