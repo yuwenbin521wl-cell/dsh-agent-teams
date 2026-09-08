@@ -2226,6 +2226,19 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const oldLive = ctx.agents.get(adopted.oldCaptain as SessionId)
       if (oldLive !== undefined) { try { ctx.subagents.interrupt(adopted.oldCaptain as SessionId, { kind: 'ancestor', agent: caller }) } catch (e) { ctx.logger.warn('could not interrupt old captain: ' + String(e)) } }
       const rehome = await rehomeTeamAfterAdopt(caller, root, adopted.teamId)
+      // Auto-clean: drain the new captain's orphaned continuable children (old/historical generations).
+      {
+        const teamAfter = await readTeam(root, adopted.teamId)
+        if (teamAfter !== undefined) {
+          const activeIds = new Set(teamAfter.members.filter(m => m.status !== 'removed' && m.id !== '').map(m => m.id))
+          const children = await ctx.subagents.listChildren(caller.id)
+          const orphanIds = children.filter(c => c !== undefined && c.id !== undefined && !activeIds.has(c.id)).map(c => c.id)
+          if (orphanIds.length > 0) {
+            await ctx.subagents.drainContinuableChildren(caller, orphanIds).catch(() => {})
+            ctx.logger.warn('agent-teams: adopt auto-cleaned ' + orphanIds.length + ' orphaned subagents')
+          }
+        }
+      }
       ctx.logger.warn('team ' + adopted.teamId + ' adopted by ' + caller.id + ' (was ' + adopted.oldCaptain + ')')
       return 'Team ' + adopted.teamId + ' adopted; you are now the captain. Auto-rehomed ' + rehome.created.length + ' member(s) and reassigned ' + rehome.rehomed + ' unfinished task(s).'
     },
