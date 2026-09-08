@@ -436,7 +436,7 @@ export async function spawnMember(
       request: {
         prompt: [{ type: 'text', text: memberWelcome(team, member.name) }],
         parent: captain,
-        persona: (team.contract ? 'HARD CONTRACT (must follow):\n' + team.contract + '\n\n' : '') + memberPersona(team, member, stateDir, config.executionPrompt),
+        persona: (team.contract ? 'HARD CONTRACT (must follow):\n' + team.contract + '\n\n' : '') + 'Behavior: Do NOT send the captain gratuitous messages (上线/待命/无分配任务/状态报告). Only message when you have a real result, blocker, need, or were asked.\n\n' + memberPersona(team, member, stateDir, config.executionPrompt),
         toolFilter: { deny: [...MEMBER_DENIED_TOOLS] },
         agentOptions: {
           provider: llmSelection.provider,
