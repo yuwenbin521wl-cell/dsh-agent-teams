@@ -639,21 +639,6 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
     if (status === 'idle') await runtime.kickTeam(workspace, located.id)
   }
 
-  // Heartbeat: periodically re-kick known teams so unassigned ready tasks get
-  // dispatched to idle members without needing a user prompt.
-  ctx.effect(() => {
-    const heartbeat = setInterval(() => {
-      for (const key of knownTeams) {
-        const sep = key.indexOf(':')
-        if (sep < 0) continue
-        const ws = key.slice(0, sep)
-        const tid = key.slice(sep + 1)
-        void runtime.kickTeam(ws, tid).catch((e) => ctx.logger.warn('agent-teams: heartbeat kick failed: ' + String(e)))
-      }
-    }, 4000)
-    return () => clearInterval(heartbeat)
-  })
-
   ctx.on('agent/status', ({ agent, status }) => {
     void syncMemberStatus(agent, status).catch((error: unknown) => {
       ctx.logger.warn(`agent-teams: member status scheduling failed for ${agent.id}: ${String(error)}`)
