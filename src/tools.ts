@@ -2346,6 +2346,38 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
   }))
 
   ctx.tools.register(defineTool({
+    name: 'agent_teams_cleanup',
+    description: 'Drain orphaned continuable subagents (old member generations) that are no longer active team members, and prune removed-member records. Call after a takeover or when many subagents accumulate.',
+    parameters: {},
+    async execute(_args, exec) {
+      const caller = requireCaptain(exec)
+      const ws = workspaceOf(caller)
+      const root = stateRootOf(ws, config)
+      const team = await requireCaptainTeam(ws, config, caller)
+      let drained = 0
+      let pruned = 0
+      await withTeamLock(teamLockKey(root, team.id), async () => {
+        const fresh = await requireFreshCaptainTeam(root, team.id, caller.id)
+        const activeIds = new Set(fresh.members.filter(m => m.status !== 'removed' && m.id !== '').map(m => m.id))
+        const children = await ctx.subagents.listChildren(caller.id)
+        const orphanIds = children
+          .filter((c) => c !== undefined && c.id !== undefined && !activeIds.has(c.id))
+          .map((c) => c.id)
+        if (orphanIds.length > 0) {
+          await ctx.subagents.drainContinuableChildren(caller, orphanIds)
+          drained = orphanIds.length
+        }
+        const beforeMembers = fresh.members.length
+        fresh.members = fresh.members.filter(m => m.status !== 'removed')
+        pruned = beforeMembers - fresh.members.length
+        await writeTeam(root, fresh)
+      })
+      return 'Drained ' + drained + ' orphaned subagent(s); pruned ' + pruned + ' removed member record(s).'
+    },
+    output: { schema: { type: 'string' }, render: textRender },
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'agent_teams_delete',
     description: 'End your team: interrupts all members (best effort) and deletes the team\'s state directory (team file, tasks, mailboxes). Use when the team\'s work is done or abandoned.',
     parameters: {},

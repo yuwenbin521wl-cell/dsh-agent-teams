@@ -208,6 +208,7 @@ export function apply(ctx: Context, config: Config): void {
     'agent_teams_set_decision',
     'agent_teams_clear_decision',
     'agent_teams_set_contract',
+    'agent_teams_cleanup',
     'agent_teams_delete',
   ].join(', ')
   ctx.systemPrompt.section({
