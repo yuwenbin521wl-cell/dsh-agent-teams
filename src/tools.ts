@@ -1395,10 +1395,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           if (busy !== undefined) {
             throw new Error(`captain is busy with ${busy.id}; complete or reassign it before taking over ${task.id}`)
           }
+          // Captain takeover is an explicit cleanup/finish action; allow it even
+          // when dependencies are unfinished/failed so zombie tasks can be taken
+          // over and then completed or cancelled by the captain.
           const pending = unsatisfiedDependencies(fresh.tasks, task.dependencies)
-          if (pending.length > 0) {
-            throw new Error(`task ${task.id} is blocked by unfinished dependencies: ${pending.join(', ')} — complete them before captain takeover`)
-          }
         } else if (targetMember !== undefined) {
           const busy = memberOpenTask(fresh, targetMember.name, task.id)
           if (busy !== undefined) {
@@ -1657,6 +1657,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         const { team: fresh, identity } = await requireFreshParticipant(stateRoot, team.id, caller.id)
         const task = requireTask(fresh, args.task_id)
         if (identity.kind === 'captain'
+          && args.status !== 'cancelled'
           && task.assignee !== undefined
           && task.assignee !== CAPTAIN_KEY) {
           throw new Error(`task ${task.id} is owned by member "${task.assignee}"; call agent_teams_reassign_task with assignee="captain" before takeover`)
