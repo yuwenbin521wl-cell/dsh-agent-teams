@@ -211,6 +211,41 @@ export function cascadeCancelDeadDependents(tasks: TeamTask[]): number {
   return changed
 }
 
+/**
+ * Cancel every non-terminal task that depends (directly or transitively) on a
+ * task that is failed OR cancelled. A failed/cancelled prerequisite can never
+ * complete a successful dependency, so a pending dependent is a dead zombie.
+ * Used at adopt/rehome time to avoid inheriting useless task chains.
+ * Mutates in place; returns how many tasks were cancelled.
+ */
+export function cancelZombieTasks(tasks: TeamTask[]): number {
+  let changed = 0
+  for (const task of tasks) {
+    if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') continue
+  }
+  let again = true
+  while (again) {
+    again = false
+    const byId = new Map(tasks.map((task) => [task.id, task]))
+    for (const task of tasks) {
+      if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') continue
+      for (const dep of task.dependencies) {
+        const depTask = byId.get(dep)
+        if (depTask !== undefined && (depTask.status === 'failed' || depTask.status === 'cancelled')) {
+          task.status = 'cancelled'
+          task.attemptId = undefined
+          task.reassigning = false
+          task.updatedAt = Date.now()
+          changed += 1
+          again = true
+          break
+        }
+      }
+    }
+  }
+  return changed
+}
+
 export function invalidateTaskAttempt(
   task: TeamTask,
   nextAssignee?: string,

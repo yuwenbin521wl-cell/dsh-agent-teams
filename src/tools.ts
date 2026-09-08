@@ -31,6 +31,7 @@ import {
   findTeamByCaptain,
   findTeamByParticipant,
   cancelUnfinishedTask,
+  cancelZombieTasks,
   invalidateTaskAttempt,
   readUnreadMailbox,
   recordRetiredMemberIds,
@@ -2230,6 +2231,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       {
         const teamAfter = await readTeam(root, adopted.teamId)
         if (teamAfter !== undefined) {
+          const zombies = cancelZombieTasks(teamAfter.tasks)
+          if (zombies > 0) {
+            await writeTeam(root, teamAfter)
+            ctx.logger.warn('agent-teams: adopt auto-cancelled ' + zombies + ' zombie task(s) depending on failed/cancelled deps')
+          }
           const activeIds = new Set(teamAfter.members.filter(m => m.status !== 'removed' && m.id !== '').map(m => m.id))
           const children = await ctx.subagents.listChildren(caller.id)
           const orphanIds = children.filter(c => c !== undefined && c.id !== undefined && !activeIds.has(c.id)).map(c => c.id)
@@ -2255,6 +2261,17 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const root = stateRootOf(ws, config)
       const team = await requireCaptainTeam(ws, config, caller)
       const result = await rehomeTeamAfterAdopt(caller, root, team.id)
+      // Auto-cancel zombie tasks depending on failed/cancelled deps.
+      {
+        const fresh = await readTeam(root, team.id)
+        if (fresh !== undefined) {
+          const zombies = cancelZombieTasks(fresh.tasks)
+          if (zombies > 0) {
+            await writeTeam(root, fresh)
+            ctx.logger.warn('agent-teams: rehome auto-cancelled ' + zombies + ' zombie task(s)')
+          }
+        }
+      }
       return 'Rehomed ' + result.created.length + ' member(s), reassigned ' + result.rehomed + ' task(s).'
     },
     output: { schema: { type: 'string' }, render: textRender },
