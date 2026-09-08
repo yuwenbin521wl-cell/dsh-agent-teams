@@ -116,6 +116,8 @@ pnpm build          # 产出 lib/（含 lib/client.js 客户端面板）
 - `escalated`（自动 review/repair 到上限）≠ `halted`（人工停止）；前者需人工决策。
 - 自动功能（`adopt` 自动补位、`autoReplace`）已通过 typecheck/构建/组成校验，**建议在真实团队先验证再用于关键生产**。
 - 旧成员被 rehome 后是旧队长的子代理，新队长无法唤醒它们（所以插件自动生成新队长名下的替代成员）。
+- **自动派发心跳**：插件每约 4s 自动 `kickTeam` 一次，把未指派/已就绪任务派给空闲成员——即使没有事件（如建任务没人派、成员空闲没触发），也会被自动领走，不再需要你催。
+- **队长验证 + 僵尸清理**：队长建任务后必须 `agent_teams_status` 核实（存在/已派/在跑），不会谎称“已运行”；队长可**接管（reassign assignee=captain）并取消**依赖已 failed/cancelled 的僵尸任务（t184/t185 类），不再被“未完成依赖”卡死。
 - **执行进度可见性**：bookkeeping 模式下，成员在任务执行期间会**周期性写进度**（`results/<taskId>.json` 里的 `in_progress` + `output`，如 “40% - 已完成X，下一步Y”）；`agent_teams_status` 会显示每个任务的 **最近更新时间（⏱Nmin）**，且 **in_progress/claimed 超 30 分钟未更新**会标 **⚠️no-progress-30min**（疑似卡住/死循环）——此时用 `agent_teams_rehome` 或 `agent_teams_reassign_task` 把活转给别人。
 
 ---

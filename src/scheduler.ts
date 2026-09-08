@@ -345,6 +345,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
   // graph kicks must keep it parked. A cold process starts with an empty map,
   // so durable open attempts are still recovered after restart.
   const parkedAttempts = new Map<string, string>()
+  const knownTeams = new Set<string>()
 
   const memberQueueKey = (stateRoot: string, teamId: string, memberName: string): string => (
     `${stateRoot}\u0000${teamId}\u0000${memberName}`
@@ -368,8 +369,11 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
   const runtime: TeamScheduler = {
     async kickTeam(workspace, teamId, suppliedCaptain) {
       const stateRoot = stateRootOf(workspace, config)
+      const key = workspace + ':' + teamId
       const team = await readTeam(stateRoot, teamId)
-      if (team === undefined || team.halted === true || team.phase === 'staged') return
+      if (team === undefined) { knownTeams.delete(key); return }
+      if (team.halted === true || team.phase === 'staged') return
+      knownTeams.add(key)
       // Auto-cancel the dead chain: dependents of a cancelled task can never run.
       if (cascadeCancelDeadDependents(team.tasks) > 0) {
         await writeTeam(stateRoot, team)
@@ -634,6 +638,21 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
     // captain having to manually reassign.
     if (status === 'idle') await runtime.kickTeam(workspace, located.id)
   }
+
+  // Heartbeat: periodically re-kick known teams so unassigned ready tasks get
+  // dispatched to idle members without needing a user prompt.
+  ctx.effect(() => {
+    const heartbeat = setInterval(() => {
+      for (const key of knownTeams) {
+        const sep = key.indexOf(':')
+        if (sep < 0) continue
+        const ws = key.slice(0, sep)
+        const tid = key.slice(sep + 1)
+        void runtime.kickTeam(ws, tid).catch((e) => ctx.logger.warn('agent-teams: heartbeat kick failed: ' + String(e)))
+      }
+    }, 4000)
+    return () => clearInterval(heartbeat)
+  })
 
   ctx.on('agent/status', ({ agent, status }) => {
     void syncMemberStatus(agent, status).catch((error: unknown) => {
