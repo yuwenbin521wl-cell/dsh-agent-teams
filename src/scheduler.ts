@@ -395,9 +395,9 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       }
       const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
       if (captain === undefined) return
-      // Auto-replace / retire exhausted members on every kick: context-full OR
-      // failed-too-many-times. If a member has open tasks, spawn a fresh
-      // replacement; if not, discard (retire) it so it no longer occupies a slot.
+      // Auto-replace exhausted members on every kick: context-full OR
+      // failed-too-many-times. Only replace a member that has an open task to
+      // hand over — a member with no open task is left as-is (no auto-retire).
       if (config.autoReplaceEnabled === true && config.spawnReplacement !== undefined) {
         const failureThreshold = config.failureThreshold ?? 2
         for (const m of team.members) {
@@ -407,21 +407,12 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           const contextExhausted = occ !== undefined && config.autoReplaceThreshold !== undefined && occ >= config.autoReplaceThreshold
           const failedTooMuch = (m.failures ?? 0) >= failureThreshold
           if (!contextExhausted && !failedTooMuch) continue
-          if (ownedOpenTask(team.tasks, m.name) !== undefined) {
-            try {
-              const r = await config.spawnReplacement(captain, stateRoot, teamId, m.name)
-              if (r.created === true) ctx.logger.warn('agent-teams: auto-replaced exhausted/failed ' + m.name + ' (kickTeam)')
-            } catch (e) {
-              ctx.logger.warn('agent-teams: auto-replace failed for ' + m.name + ': ' + String(e))
-            }
-          } else {
-            const fresh = await readTeam(stateRoot, teamId)
-            const fm = fresh?.members.find(function (x) { return x.name === m.name })
-            if (fresh !== undefined && fm !== undefined) {
-              fm.status = 'removed'
-              await writeTeam(stateRoot, fresh)
-              ctx.logger.warn('agent-teams: retired exhausted/failed ' + m.name + ' (no open tasks, kickTeam)')
-            }
+          if (ownedOpenTask(team.tasks, m.name) === undefined) continue
+          try {
+            const r = await config.spawnReplacement(captain, stateRoot, teamId, m.name)
+            if (r.created === true) ctx.logger.warn('agent-teams: auto-replaced exhausted/failed ' + m.name + ' (kickTeam)')
+          } catch (e) {
+            ctx.logger.warn('agent-teams: auto-replace failed for ' + m.name + ': ' + String(e))
           }
         }
       }
