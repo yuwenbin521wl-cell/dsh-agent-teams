@@ -2150,7 +2150,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         const member: TeamMember = {
           id: '', name: name, role: old.role, provider: old.provider, model: old.model,
           reasoningEffort: old.reasoningEffort, executionPrompt: old.executionPrompt,
-          joinedAt: Date.now(), status: 'idle', replacement: true,
+          joinedAt: Date.now(), status: 'idle', replacement: true, replacementDepth: (old.replacementDepth ?? 0) + 1,
         }
         await spawnMember(ctx, memberRuntime(config), memberSelections, selection, caller, team, member, config.stateDir, new AbortController().signal)
         team.members.push(member)
@@ -2208,7 +2208,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const member: TeamMember = {
         id: '', name: name, role: old.role, provider: old.provider, model: old.model,
         reasoningEffort: old.reasoningEffort, executionPrompt: old.executionPrompt,
-        joinedAt: Date.now(), status: 'idle', replacement: true,
+        joinedAt: Date.now(), status: 'idle', replacement: true, replacementDepth: (old.replacementDepth ?? 0) + 1,
       }
       await spawnMember(ctx, memberRuntime(config), memberSelections, selection, caller, team, member, config.stateDir, new AbortController().signal)
       team.members.push(member)

@@ -168,6 +168,8 @@ export interface TeamMember {
   replacement?: boolean
   /** Number of failed tasks attributed to this member (used for failure-based replacement). */
   failures?: number
+  /** How many replacement generations deep this member is (0 = original; used to cap auto-replace). */
+  replacementDepth?: number
   joinedAt: number
   status: MemberStatus
 }

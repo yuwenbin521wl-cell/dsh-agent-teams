@@ -46,6 +46,7 @@ export interface SchedulerConfig {
   /** When set, log a warning when a member idle-edge shows occupancy >= this fraction. */
   readonly autoReplaceThreshold?: number
   readonly failureThreshold?: number
+  readonly maxAutoReplace?: number
   /** When true, the plugin closes tasks itself from a member result file (captain bookkeeping). */
   readonly bookkeepingByCaptain?: boolean
   /** When true, auto-spawn a replacement member when a member crosses the context threshold. */
@@ -407,6 +408,11 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           const contextExhausted = occ !== undefined && config.autoReplaceThreshold !== undefined && occ >= config.autoReplaceThreshold
           const failedTooMuch = (m.failures ?? 0) >= failureThreshold
           if (!contextExhausted && !failedTooMuch) continue
+          const maxAutoReplace = config.maxAutoReplace ?? 2
+          if ((m.replacementDepth ?? 0) >= maxAutoReplace) {
+            ctx.logger.warn('agent-teams: replacement cap reached for ' + m.name + ' (depth ' + (m.replacementDepth ?? 0) + ' >= ' + maxAutoReplace + '); not auto-replacing — captain/user should decide if the task is even possible')
+            continue
+          }
           if (ownedOpenTask(team.tasks, m.name) === undefined) continue
           try {
             const r = await config.spawnReplacement(captain, stateRoot, teamId, m.name)
