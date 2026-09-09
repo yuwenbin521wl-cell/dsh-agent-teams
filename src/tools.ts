@@ -2125,6 +2125,18 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           old.status = 'removed'
           continue
         }
+        const liveCount = team.members.filter((m) => m.status !== 'removed').length
+        if (liveCount >= config.maxMembers) {
+          // Cap reached: requeue this old member's tasks and retire it (no extra live agent).
+          for (const tk of team.tasks) {
+            if (tk.assignee === old.name && (tk.status === 'pending' || tk.status === 'claimed' || tk.status === 'in_progress')) {
+              tk.assignee = undefined; tk.status = 'pending'; tk.attemptId = undefined; tk.reassigning = false; tk.updatedAt = Date.now()
+            }
+          }
+          old.status = 'removed'
+          ctx.logger.warn('agent-teams: adopt rehome cap reached (' + config.maxMembers + '); retired ' + old.name + ' without replacement')
+          continue
+        }
         const used = new Set(team.members.map(function (m) { return m.name }))
         let n = 2
         while (used.has(old.name + '-r' + n)) { n += 1 }
@@ -2170,6 +2182,20 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         return t.assignee === old.name && (t.status === 'pending' || t.status === 'claimed' || t.status === 'in_progress')
       })
       if (owned.length === 0) return
+      const liveCount = team.members.filter((m) => m.status !== 'removed').length
+      if (liveCount >= config.maxMembers) {
+        // Cap reached: cannot create another live member/agent. Requeue the old
+        // member's tasks and retire it instead of spawning a replacement.
+        for (const t of team.tasks) {
+          if (t.assignee === old.name && (t.status === 'pending' || t.status === 'claimed' || t.status === 'in_progress')) {
+            t.assignee = undefined; t.status = 'pending'; t.attemptId = undefined; t.attempt = (t.attempt ?? 0) + 1; t.reassigning = false; t.updatedAt = Date.now()
+          }
+        }
+        old.status = 'removed'
+        await writeTeam(stateRoot, team)
+        ctx.logger.warn('agent-teams: member cap reached (' + config.maxMembers + '); retired ' + old.name + ' without replacement')
+        return
+      }
       const used = new Set(team.members.map(function (m) { return m.name }))
       let n = 3
       while (used.has(old.name + '-r' + n)) { n += 1 }

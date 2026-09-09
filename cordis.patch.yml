@@ -24,3 +24,4 @@
         # Auto-create a replacement member when a member crosses the context threshold and transfer its open tasks.
         autoReplaceEnabled: true
         autoReplaceThreshold: 0.7
+        maxMembers: 10

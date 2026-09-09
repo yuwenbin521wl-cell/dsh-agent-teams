@@ -133,7 +133,7 @@ export const Config: z<Config> = z.object({
     })),
   })).default({}),
   memberMaxDepth: z.natural().default(1),
-  maxMembers: z.natural().min(1).default(8),
+  maxMembers: z.natural().min(1).default(10),
   // Agent presets whose member subagents expose agent_teams_* tools. Members
   // inherit the captain's standing preset (alpha.4 composeFrom), so spawning
   // under a minimal/ptc preset silently strips the team tools. Requiring a
