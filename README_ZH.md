@@ -122,5 +122,31 @@ pnpm build          # 产出 lib/（含 lib/client.js 客户端面板）
 
 ---
 
+## 十三、自动治理与自愈（Auto-governance）
+
+插件内置一套“自动治理”，防止上下文被撑爆、死链/僵尸堆积、无限换人：
+
+- **成员 / 活子代理上限 `maxMembers=10`**：`agent_teams_add_member` 超 10 抛错；adopt/rehome **1 换 1 替换**不突破上限，只有已超上限才停。
+- **自动替换（有开放任务才换）**：成员**上下文满**（≥ `autoReplaceThreshold` 默认 0.7）或**任务失败≥ `failureThreshold` 默认 2**，且**有开放任务** → 自动 spawn 新成员接管、旧成员退役；**无任务不动**（不自动废弃）。
+- **替换上限 `maxAutoReplace=2`**：按 `replacementDepth` 计代，**自动替换到 2 代就停**，改由**队长/用户判断**任务是否本身无法完成。
+  - **显式替换不受此限**：队长/用户明确要求（`agent_teams_rehome` / `agent_teams_reassign_task` / 让队长换）可**继续替换**，不受自动上限限制。
+- **自动清理**：
+  - `agent_teams_adopt` / `agent_teams_rehome` 自动**取消僵尸任务**（依赖链含 failed/cancelled，`cancelZombieTasks`）+ **归档历史**（`archive-tasks.json`）+ **清孤儿子代理**。
+  - `agent_teams_cleanup`：清除当前队长名下“非活跃成员”的孤儿子代理 + 修剪 removed 成员记录。
+- **成员不刷屏**：成员 persona 禁止发无意义消息（上线/待命/无分配任务/状态报告），只在真实结果/阻塞/被问时发。
+- **执行进度可见**：成员用结果文件 `in_progress` 刷新进度，`agent_teams_status` 显示 `⏱Nmin` + `⚠️no-progress-30min`。
+
+对应 `cordis.patch.yml` 配置：
+
+```yaml
+memberBookkeepingByCaptain: true
+autoReplaceEnabled: true
+autoReplaceThreshold: 0.7   # 上下文 ≥70% 触发自动换人
+failureThreshold: 2          # 失败 ≥2 次触发自动换人
+maxAutoReplace: 2            # 自动替换到第 2 代就停（交队长/用户判断）
+maxMembers: 10               # 活成员/子代理上限
+```
+---
+
 ## 许可证
 MIT（继承上游）。
