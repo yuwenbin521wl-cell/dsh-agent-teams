@@ -76,6 +76,8 @@ export interface Config {
   autoReplaceThreshold?: number
   /** Whether the 70%-context auto-replace is enabled (default true). */
   autoReplaceEnabled?: boolean
+  /** Discard and replace a member after this many failed tasks (default 2). */
+  failureThreshold?: number
   /** When true, the captain/plugin performs task state bookkeeping on behalf of members (claim/update) based on a result file, so members work even without agent_teams tools. Default false. */
   memberBookkeepingByCaptain?: boolean
   /** Prompt-section order for the usage policy (default `117`, after delegation policy). */
@@ -134,6 +136,7 @@ export const Config: z<Config> = z.object({
   })).default({}),
   memberMaxDepth: z.natural().default(1),
   maxMembers: z.natural().min(1).default(10),
+  failureThreshold: z.natural().min(1).default(2),
   // Agent presets whose member subagents expose agent_teams_* tools. Members
   // inherit the captain's standing preset (alpha.4 composeFrom), so spawning
   // under a minimal/ptc preset silently strips the team tools. Requiring a

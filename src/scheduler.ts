@@ -45,6 +45,7 @@ export interface SchedulerConfig {
   readonly executionPrompt?: string
   /** When set, log a warning when a member idle-edge shows occupancy >= this fraction. */
   readonly autoReplaceThreshold?: number
+  readonly failureThreshold?: number
   /** When true, the plugin closes tasks itself from a member result file (captain bookkeeping). */
   readonly bookkeepingByCaptain?: boolean
   /** When true, auto-spawn a replacement member when a member crosses the context threshold. */
@@ -332,6 +333,10 @@ async function completeTaskFromResult(ctx: Context, stateRoot: string, teamId: s
     }
     task.output = result.output
     task.updatedAt = Date.now()
+    if (result.status === 'failed') {
+      const member = team.members.find(function (m) { return m.name === memberName && m.status !== 'removed' })
+      if (member !== undefined) member.failures = (member.failures ?? 0) + 1
+    }
     await writeTeam(stateRoot, team)
     ctx.logger.warn('agent-teams: captain bookkeeping closed ' + task.id + ' from result: ' + result.status)
   })
@@ -390,21 +395,33 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       }
       const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
       if (captain === undefined) return
-      // Auto-replace context-full resident members on every kick (not only the
-      // idle-edge), so a cold-restored, already-exhausted team also gets replacements.
+      // Auto-replace / retire exhausted members on every kick: context-full OR
+      // failed-too-many-times. If a member has open tasks, spawn a fresh
+      // replacement; if not, discard (retire) it so it no longer occupies a slot.
       if (config.autoReplaceEnabled === true && config.spawnReplacement !== undefined) {
+        const failureThreshold = config.failureThreshold ?? 2
         for (const m of team.members) {
           if (m.status === 'removed' || m.id === '') continue
           const live = ctx.agents.get(m.id as SessionId)
-          if (live === undefined) continue
-          const occ = readMemberContextPressure(ctx, live)
-          if (occ === undefined || config.autoReplaceThreshold === undefined || occ < config.autoReplaceThreshold) continue
-          if (ownedOpenTask(team.tasks, m.name) === undefined) continue
-          try {
-            const r = await config.spawnReplacement(captain, stateRoot, teamId, m.name)
-            if (r.created === true) ctx.logger.warn('agent-teams: auto-replaced context-full ' + m.name + ' (kickTeam)')
-          } catch (e) {
-            ctx.logger.warn('agent-teams: auto-replace failed for ' + m.name + ': ' + String(e))
+          const occ = live === undefined ? undefined : readMemberContextPressure(ctx, live)
+          const contextExhausted = occ !== undefined && config.autoReplaceThreshold !== undefined && occ >= config.autoReplaceThreshold
+          const failedTooMuch = (m.failures ?? 0) >= failureThreshold
+          if (!contextExhausted && !failedTooMuch) continue
+          if (ownedOpenTask(team.tasks, m.name) !== undefined) {
+            try {
+              const r = await config.spawnReplacement(captain, stateRoot, teamId, m.name)
+              if (r.created === true) ctx.logger.warn('agent-teams: auto-replaced exhausted/failed ' + m.name + ' (kickTeam)')
+            } catch (e) {
+              ctx.logger.warn('agent-teams: auto-replace failed for ' + m.name + ': ' + String(e))
+            }
+          } else {
+            const fresh = await readTeam(stateRoot, teamId)
+            const fm = fresh?.members.find(function (x) { return x.name === m.name })
+            if (fresh !== undefined && fm !== undefined) {
+              fm.status = 'removed'
+              await writeTeam(stateRoot, fresh)
+              ctx.logger.warn('agent-teams: retired exhausted/failed ' + m.name + ' (no open tasks, kickTeam)')
+            }
           }
         }
       }

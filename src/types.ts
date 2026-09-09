@@ -166,6 +166,8 @@ export interface TeamMember {
   fallbackActive?: boolean
   /** True when this member was auto-created as a replacement by adopt/rehome (child of the current captain). */
   replacement?: boolean
+  /** Number of failed tasks attributed to this member (used for failure-based replacement). */
+  failures?: number
   joinedAt: number
   status: MemberStatus
 }
