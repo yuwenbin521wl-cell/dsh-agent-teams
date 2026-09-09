@@ -304,6 +304,7 @@ function bookkeepingAssignmentPrompt(ticket: DispatchTicket, stateDir: string, t
     '{"status":"completed","output":"<done summary>"}  - task is finished, captain will complete it.',
     '{"status":"failed","output":"<blocking reason>"}   - blocked, captain marks failed.',
     '{"status":"in_progress","output":"<progress so far>"}  - still working, captain keeps it in_progress.',
+    'If your task\'s OWN scope is fully done but a cross-task regression (introduced by ANOTHER task) remains, write {"status":"completed","output":"<done summary>","deferredTo":"<taskId>","deferredNote":"<issue belonging to that other task>"} — the regression is tracked separately; do NOT mark your task failed for a regression you do not own.',
     'While working, refresh the result file PERIODICALLY (at least every few minutes) with {"status":"in_progress","output":"<percent/milestone, e.g. 40% - done X, next Y>"} so the captain/team can see how far you have got and detect if you are stuck.',
     'Then end your turn and become idle. The captain reads the file. If in_progress you may be woken again to continue; if completed/failed the task closes.'
   ].join('\n')
@@ -311,12 +312,17 @@ function bookkeepingAssignmentPrompt(ticket: DispatchTicket, stateDir: string, t
 
 /** In captain-bookkeeping mode, close a member's owned open task from its result file. */
 async function completeTaskFromResult(ctx: Context, stateRoot: string, teamId: string, memberName: string): Promise<void> {
-  const readResult = async (taskId: string): Promise<{ status: string; output?: string } | undefined> => {
+  const readResult = async (taskId: string): Promise<{ status: string; output?: string; deferredTo?: string; deferredNote?: string } | undefined> => {
     try {
       const raw = await readFile(join(stateRoot, teamId, 'results', taskId + '.json'), 'utf8')
-      const parsed = JSON.parse(raw) as { status?: unknown; output?: unknown }
+      const parsed = JSON.parse(raw) as { status?: unknown; output?: unknown; deferredTo?: unknown; deferredNote?: unknown }
       if (typeof parsed.status !== 'string' || !['completed', 'failed', 'in_progress'].includes(parsed.status)) return undefined
-      return { status: parsed.status, output: typeof parsed.output === 'string' ? parsed.output : undefined }
+      return {
+        status: parsed.status,
+        output: typeof parsed.output === 'string' ? parsed.output : undefined,
+        deferredTo: typeof parsed.deferredTo === 'string' ? parsed.deferredTo : undefined,
+        deferredNote: typeof parsed.deferredNote === 'string' ? parsed.deferredNote : undefined,
+      }
     } catch { return undefined }
   }
   await withTeamLock(teamLockKey(stateRoot, teamId), async () => {
@@ -334,6 +340,10 @@ async function completeTaskFromResult(ctx: Context, stateRoot: string, teamId: s
     }
     task.output = result.output
     task.updatedAt = Date.now()
+    if (result.status === 'completed' && result.deferredTo !== undefined) {
+      task.deferredTo = result.deferredTo
+      if (result.deferredNote !== undefined) task.deferredNote = result.deferredNote
+    }
     if (result.status === 'failed') {
       const member = team.members.find(function (m) { return m.name === memberName && m.status !== 'removed' })
       if (member !== undefined) member.failures = (member.failures ?? 0) + 1

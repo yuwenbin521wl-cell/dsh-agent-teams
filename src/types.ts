@@ -111,6 +111,10 @@ export interface TeamTask {
   handoffId?: string
   /** A handoff is quiescing the old owner; the scheduler must not dispatch it yet. */
   reassigning?: boolean
+  /** A cross-task regression this task deferred to another task (task id), so the source task can close as completed instead of failed. */
+  deferredTo?: string
+  /** Human-readable note for the deferred regression. */
+  deferredNote?: string
   /** Quality-gate kind. Missing values are treated as `work`. */
   kind?: TaskKind
   /** Review / requirements / repair loop index, 1-based when present. */
