@@ -2126,8 +2126,8 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           continue
         }
         const liveCount = team.members.filter((m) => m.status !== 'removed').length
-        if (liveCount >= config.maxMembers) {
-          // Cap reached: requeue this old member's tasks and retire it (no extra live agent).
+        if (liveCount > config.maxMembers) {
+          // Only block when already OVER the cap; a 1-for-1 replacement keeps the count, so it is allowed.
           for (const tk of team.tasks) {
             if (tk.assignee === old.name && (tk.status === 'pending' || tk.status === 'claimed' || tk.status === 'in_progress')) {
               tk.assignee = undefined; tk.status = 'pending'; tk.attemptId = undefined; tk.reassigning = false; tk.updatedAt = Date.now()
@@ -2183,8 +2183,8 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       })
       if (owned.length === 0) return
       const liveCount = team.members.filter((m) => m.status !== 'removed').length
-      if (liveCount >= config.maxMembers) {
-        // Cap reached: cannot create another live member/agent. Requeue the old
+      if (liveCount > config.maxMembers) {
+        // Only block when already OVER the cap; a 1-for-1 replacement keeps the count, so it is allowed. Requeue the old
         // member's tasks and retire it instead of spawning a replacement.
         for (const t of team.tasks) {
           if (t.assignee === old.name && (t.status === 'pending' || t.status === 'claimed' || t.status === 'in_progress')) {
